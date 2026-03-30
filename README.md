@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kotacom CMS + Frontend
 
-## Getting Started
+Website marketing + simple CMS untuk Kotacom dengan stack:
+- Next.js 16 (App Router)
+- shadcn/ui + Geist font
+- Theme brand biru gelap
+- Custom CMS `/admin`
+- API publik/admin
+- Postgres (Supabase/Neon) dengan fallback in-memory seed
 
-First, run the development server:
+## Fitur v1
 
+- Frontend pages: `/`, `/services`, `/shop`, `/blog`, `/portfolio`, `/contact`
+- Dynamic detail pages per slug
+- CMS dashboard: `/admin`
+- CRUD content type: `services`, `products`, `posts`, `portfolio`, `pages`
+- API contracts:
+  - `GET /api/public/[type]`
+  - `GET /api/public/[type]/[slug]`
+  - `GET|POST /api/admin/[type]`
+  - `PATCH|DELETE /api/admin/[type]/[id]`
+  - `POST /api/media/upload`
+- Supabase magic link callback: `/auth/callback`
+
+## Setup
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Copy env:
+```bash
+cp .env.example .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Jalankan dev server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Buka:
+- Website: `http://localhost:3000`
+- Admin: `http://localhost:3000/admin`
 
-## Learn More
+## Database
 
-To learn more about Next.js, take a look at the following resources:
+Migration SQL ada di:
+- `supabase/migrations/001_init.sql`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Jika `DATABASE_URL` belum diisi, aplikasi tetap jalan dengan seeded content in-memory.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Auth Admin
 
-## Deploy on Vercel
+- Dengan Supabase env terisi: login via magic link di `/admin/login`
+- Tanpa Supabase env: mode fallback lokal, `/admin` tetap bisa diakses untuk development
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Quality Checks
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run build
+```
