@@ -34,3 +34,14 @@ export type SiteSettings = {
   nav: Array<{ label: string; href: string }>;
   social: Array<{ label: string; href: string }>;
 };
+
+export type LeadEntry = {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string;
+  phone: string;
+  message: string;
+  status: "new" | "contacted";
+  createdAt: string;
+};

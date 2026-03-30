@@ -1,14 +1,24 @@
+import dns from "node:dns";
 import postgres from "postgres";
 
-import { contentInputSchema, contentUpdateSchema, siteSettingsSchema } from "@/lib/content/schema";
+import {
+  contentInputSchema,
+  contentUpdateSchema,
+  leadInputSchema,
+  siteSettingsSchema,
+} from "@/lib/content/schema";
 import { defaultSettings, seedContent } from "@/lib/content/seed";
-import type { ContentEntry, ContentType, SiteSettings } from "@/lib/content/types";
+import type { ContentEntry, ContentType, LeadEntry, SiteSettings } from "@/lib/content/types";
 
 const DATABASE_URL = process.env.DATABASE_URL;
+
+// Supabase host can resolve to IPv6 first; force IPv4-first for environments without IPv6 route.
+dns.setDefaultResultOrder("ipv4first");
 
 const memoryStore = {
   content: [...seedContent],
   settings: { ...defaultSettings },
+  leads: [] as LeadEntry[],
 };
 
 let sqlClient: postgres.Sql | null = null;
@@ -69,28 +79,35 @@ export async function listPublicContent(type: ContentType, limit = 12): Promise<
       .slice(0, limit);
   }
 
-  const rows = await sql<{
-    id: string;
-    type: ContentType;
-    slug: string;
-    title: string;
-    excerpt: string;
-    body: string;
-    status: "draft" | "published";
-    cover_image: string | null;
-    meta: Record<string, unknown>;
-    published_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }[]>`
-    select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
-    from content_entries
-    where type = ${type} and status = 'published'
-    order by coalesce(published_at, updated_at) desc
-    limit ${limit}
-  `;
+  try {
+    const rows = await sql<{
+      id: string;
+      type: ContentType;
+      slug: string;
+      title: string;
+      excerpt: string;
+      body: string;
+      status: "draft" | "published";
+      cover_image: string | null;
+      meta: Record<string, unknown>;
+      published_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>`
+      select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
+      from content_entries
+      where type = ${type} and status = 'published'
+      order by coalesce(published_at, updated_at) desc
+      limit ${limit}
+    `;
 
-  return rows.map(toEntry);
+    return rows.map(toEntry);
+  } catch {
+    return memoryStore.content
+      .filter((item) => item.type === type && item.status === "published")
+      .sort(sortByPublishedAtDesc)
+      .slice(0, limit);
+  }
 }
 
 export async function listAdminContent(type: ContentType): Promise<ContentEntry[]> {
@@ -102,27 +119,33 @@ export async function listAdminContent(type: ContentType): Promise<ContentEntry[
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  const rows = await sql<{
-    id: string;
-    type: ContentType;
-    slug: string;
-    title: string;
-    excerpt: string;
-    body: string;
-    status: "draft" | "published";
-    cover_image: string | null;
-    meta: Record<string, unknown>;
-    published_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }[]>`
-    select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
-    from content_entries
-    where type = ${type}
-    order by updated_at desc
-  `;
+  try {
+    const rows = await sql<{
+      id: string;
+      type: ContentType;
+      slug: string;
+      title: string;
+      excerpt: string;
+      body: string;
+      status: "draft" | "published";
+      cover_image: string | null;
+      meta: Record<string, unknown>;
+      published_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>`
+      select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
+      from content_entries
+      where type = ${type}
+      order by updated_at desc
+    `;
 
-  return rows.map(toEntry);
+    return rows.map(toEntry);
+  } catch {
+    return memoryStore.content
+      .filter((item) => item.type === type)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
 }
 
 export async function getContentBySlug(
@@ -143,29 +166,40 @@ export async function getContentBySlug(
     );
   }
 
-  const rows = await sql<{
-    id: string;
-    type: ContentType;
-    slug: string;
-    title: string;
-    excerpt: string;
-    body: string;
-    status: "draft" | "published";
-    cover_image: string | null;
-    meta: Record<string, unknown>;
-    published_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }[]>`
-    select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
-    from content_entries
-    where type = ${type}
-      and slug = ${slug}
-      ${includeDraft ? sql`` : sql`and status = 'published'`}
-    limit 1
-  `;
+  try {
+    const rows = await sql<{
+      id: string;
+      type: ContentType;
+      slug: string;
+      title: string;
+      excerpt: string;
+      body: string;
+      status: "draft" | "published";
+      cover_image: string | null;
+      meta: Record<string, unknown>;
+      published_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>`
+      select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
+      from content_entries
+      where type = ${type}
+        and slug = ${slug}
+        ${includeDraft ? sql`` : sql`and status = 'published'`}
+      limit 1
+    `;
 
-  return rows[0] ? toEntry(rows[0]) : null;
+    return rows[0] ? toEntry(rows[0]) : null;
+  } catch {
+    return (
+      memoryStore.content.find(
+        (item) =>
+          item.type === type &&
+          item.slug === slug &&
+          (includeDraft || item.status === "published"),
+      ) ?? null
+    );
+  }
 }
 
 export async function getContentById(type: ContentType, id: string): Promise<ContentEntry | null> {
@@ -175,27 +209,31 @@ export async function getContentById(type: ContentType, id: string): Promise<Con
     return memoryStore.content.find((item) => item.type === type && item.id === id) ?? null;
   }
 
-  const rows = await sql<{
-    id: string;
-    type: ContentType;
-    slug: string;
-    title: string;
-    excerpt: string;
-    body: string;
-    status: "draft" | "published";
-    cover_image: string | null;
-    meta: Record<string, unknown>;
-    published_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }[]>`
-    select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
-    from content_entries
-    where type = ${type} and id = ${id}
-    limit 1
-  `;
+  try {
+    const rows = await sql<{
+      id: string;
+      type: ContentType;
+      slug: string;
+      title: string;
+      excerpt: string;
+      body: string;
+      status: "draft" | "published";
+      cover_image: string | null;
+      meta: Record<string, unknown>;
+      published_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }[]>`
+      select id, type, slug, title, excerpt, body, status, cover_image, meta, published_at, created_at, updated_at
+      from content_entries
+      where type = ${type} and id = ${id}
+      limit 1
+    `;
 
-  return rows[0] ? toEntry(rows[0]) : null;
+    return rows[0] ? toEntry(rows[0]) : null;
+  } catch {
+    return memoryStore.content.find((item) => item.type === type && item.id === id) ?? null;
+  }
 }
 
 export async function createContent(type: ContentType, payload: unknown): Promise<ContentEntry> {
@@ -318,18 +356,22 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     return memoryStore.settings;
   }
 
-  const rows = await sql<{ value: SiteSettings }[]>`
-    select value
-    from site_settings
-    where key = 'default'
-    limit 1
-  `;
+  try {
+    const rows = await sql<{ value: SiteSettings }[]>`
+      select value
+      from site_settings
+      where key = 'default'
+      limit 1
+    `;
 
-  if (!rows[0]) {
-    return defaultSettings;
+    if (!rows[0]) {
+      return defaultSettings;
+    }
+
+    return siteSettingsSchema.parse(rows[0].value);
+  } catch {
+    return memoryStore.settings;
   }
-
-  return siteSettingsSchema.parse(rows[0].value);
 }
 
 export async function upsertSiteSettings(payload: unknown): Promise<SiteSettings> {
@@ -349,6 +391,77 @@ export async function upsertSiteSettings(payload: unknown): Promise<SiteSettings
   `;
 
   return settings;
+}
+
+export async function createLead(payload: unknown): Promise<LeadEntry> {
+  const parsed = leadInputSchema.parse(payload);
+  const timestamp = new Date().toISOString();
+
+  const data: LeadEntry = {
+    id: crypto.randomUUID(),
+    name: parsed.name,
+    company: parsed.company,
+    email: parsed.email,
+    phone: parsed.phone,
+    message: parsed.message,
+    status: "new",
+    createdAt: timestamp,
+  };
+
+  const sql = getSql();
+  if (!sql) {
+    memoryStore.leads.unshift(data);
+    return data;
+  }
+
+  try {
+    await sql`
+      insert into contact_leads (id, name, company, email, phone, message, status, created_at)
+      values (${data.id}, ${data.name}, ${data.company}, ${data.email}, ${data.phone}, ${data.message}, ${data.status}, ${data.createdAt})
+    `;
+  } catch {
+    memoryStore.leads.unshift(data);
+  }
+
+  return data;
+}
+
+export async function listAdminLeads(limit = 200): Promise<LeadEntry[]> {
+  const sql = getSql();
+  if (!sql) {
+    return memoryStore.leads.slice(0, limit);
+  }
+
+  try {
+    const rows = await sql<{
+      id: string;
+      name: string;
+      company: string | null;
+      email: string;
+      phone: string;
+      message: string;
+      status: "new" | "contacted";
+      created_at: string;
+    }[]>`
+      select id, name, company, email, phone, message, status, created_at
+      from contact_leads
+      order by created_at desc
+      limit ${limit}
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      company: row.company,
+      email: row.email,
+      phone: row.phone,
+      message: row.message,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  } catch {
+    return memoryStore.leads.slice(0, limit);
+  }
 }
 
 export function isDatabaseConfigured(): boolean {

@@ -1,18 +1,22 @@
 import { requireAdminUser } from "@/lib/auth";
-import { listAdminContent } from "@/lib/content/repository";
+import { getSiteSettings, listAdminContent, listAdminLeads } from "@/lib/content/repository";
 
 import { ContentManager } from "@/components/admin/content-manager";
+import { LeadsTable } from "@/components/admin/leads-table";
+import { SiteSettingsForm } from "@/components/admin/site-settings-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function AdminPage() {
   const user = await requireAdminUser();
 
-  const [services, products, posts, portfolio, pages] = await Promise.all([
+  const [services, products, posts, portfolio, pages, settings, leads] = await Promise.all([
     listAdminContent("services"),
     listAdminContent("products"),
     listAdminContent("posts"),
     listAdminContent("portfolio"),
     listAdminContent("pages"),
+    getSiteSettings(),
+    listAdminLeads(),
   ]);
 
   return (
@@ -42,6 +46,12 @@ export default async function AdminPage() {
           <TabsTrigger value="pages" className="rounded-full data-[state=active]:bg-brand-300 data-[state=active]:text-brand-950">
             Pages
           </TabsTrigger>
+          <TabsTrigger value="settings" className="rounded-full data-[state=active]:bg-brand-300 data-[state=active]:text-brand-950">
+            Settings
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="rounded-full data-[state=active]:bg-brand-300 data-[state=active]:text-brand-950">
+            Leads
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="services">
@@ -58,6 +68,12 @@ export default async function AdminPage() {
         </TabsContent>
         <TabsContent value="pages">
           <ContentManager type="pages" title="Static Pages" initialItems={pages} />
+        </TabsContent>
+        <TabsContent value="settings">
+          <SiteSettingsForm initialSettings={settings} />
+        </TabsContent>
+        <TabsContent value="leads">
+          <LeadsTable leads={leads} />
         </TabsContent>
       </Tabs>
     </main>

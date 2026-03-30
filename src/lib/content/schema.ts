@@ -37,3 +37,11 @@ export const siteSettingsSchema = z.object({
   nav: z.array(z.object({ label: z.string(), href: z.string() })).default([]),
   social: z.array(z.object({ label: z.string(), href: z.string() })).default([]),
 });
+
+export const leadInputSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  company: z.string().trim().max(120).optional().nullable().default(null),
+  email: z.string().trim().email(),
+  phone: z.string().trim().min(6).max(40),
+  message: z.string().trim().min(12).max(2000),
+});

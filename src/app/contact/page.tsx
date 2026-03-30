@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getSiteConfig, toWhatsappHref } from "@/lib/site";
 
+import { ContactForm } from "@/components/contact/contact-form";
 import { Button } from "@/components/ui/button";
 
 export default async function ContactPage() {
@@ -30,7 +31,9 @@ export default async function ContactPage() {
         </div>
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-3">
+      <ContactForm />
+
+      <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild className="rounded-full bg-brand-300 px-6 text-brand-950 hover:bg-brand-200">
           <Link href={toWhatsappHref(settings.whatsappNumber)}>Chat WhatsApp</Link>
         </Button>
